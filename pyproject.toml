@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "doover-tunnel"
+description = "Private tunnels to Doover devices: the `doover-tunnel` binary that `doover tunnel` runs."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+dynamic = ["version"]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Rust",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://doover.com"
+Source = "https://github.com/getdoover/doover-tunnel"
+
+[tool.maturin]
+bindings = "bin"
+features = ["cli"]
+strip = true
