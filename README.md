@@ -14,7 +14,12 @@ uv tool install doover-cli    # or: pipx install doover-cli
 doover login
 doover tunnel <device>        # private tunnel to the device, forwarded to localhost
 doover ssh <device>           # the same, straight into ssh
+doover ssh <device> -- uptime # ssh arguments go after --
 ```
+
+`<device>` is the device's id, name or display name. `doover ssh` uses the
+device's SSH tunnel and creates one (localhost:22, the device type's ssh
+user) when it has none.
 
 ## Building
 
