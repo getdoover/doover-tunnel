@@ -43,8 +43,18 @@ pub struct TunnelSession {
     /// admits.
     #[serde(default = "default_true")]
     pub http_auth: bool,
+    /// Http mode: credentials the relay sends to Cockpit's login so the user
+    /// skips its login page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_basic_auth: Option<BasicAuth>,
     /// Unix seconds.
     pub exp: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BasicAuth {
+    pub username: String,
+    pub password: String,
 }
 
 fn default_true() -> bool {
