@@ -925,6 +925,7 @@ pub async fn run(cmd: TunnelCmd) -> CliResult {
                 allow_ips: vec![],
                 user_id: None,
                 http_auth: true,
+                http_basic_auth: None,
                 exp: now_unix() + ttl_ms.div_ceil(1000),
             };
             struct Fixed(String);
