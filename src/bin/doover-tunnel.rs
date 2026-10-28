@@ -266,30 +266,38 @@ mod profile {
         /// lines in place.
         pub fn save(&self) -> Result<(), Err> {
             let text = std::fs::read_to_string(&self.path)?;
-            let (s, e) = block_bounds(&text, &self.name).ok_or("profile vanished")?;
-            let mut block = String::new();
-            for line in text[s..e].lines() {
-                match line.split_once('=') {
-                    Some((k, _))
-                        if matches!(k.trim(), "TOKEN" | "TOKEN_EXPIRES" | "REFRESH_TOKEN") =>
-                    {
-                        block.push_str(&format!(
-                            "{}={}\n",
-                            k.trim(),
-                            self.fields.get(k.trim()).cloned().unwrap_or_default()
-                        ));
-                    }
-                    _ => {
-                        block.push_str(line);
-                        block.push('\n');
-                    }
-                }
-            }
-            let block = block.trim_end_matches('\n');
-            let out = format!("{}{}{}", &text[..s], block, &text[e..]);
+            let out = rewrite(&text, &self.name, &self.fields).ok_or("profile vanished")?;
             std::fs::write(&self.path, out)?;
             Ok(())
         }
+    }
+
+    /// `text` with `name`'s token lines replaced from `fields`. The block's
+    /// trailing newlines are kept as they were: pydoover splits profiles on
+    /// a blank line, so losing the one before the next `[profile=...]`
+    /// merges that profile into this one.
+    fn rewrite(text: &str, name: &str, fields: &BTreeMap<String, String>) -> Option<String> {
+        let (s, e) = block_bounds(text, name)?;
+        let original = &text[s..e];
+        let body = original.trim_end_matches('\n');
+        let mut block = String::new();
+        for (i, line) in body.lines().enumerate() {
+            if i > 0 {
+                block.push('\n');
+            }
+            match line.split_once('=') {
+                Some((k, _)) if matches!(k.trim(), "TOKEN" | "TOKEN_EXPIRES" | "REFRESH_TOKEN") => {
+                    let k = k.trim();
+                    block.push_str(&format!(
+                        "{k}={}",
+                        fields.get(k).cloned().unwrap_or_default()
+                    ));
+                }
+                _ => block.push_str(line),
+            }
+        }
+        block.push_str(&original[body.len()..]);
+        Some(format!("{}{}{}", &text[..s], block, &text[e..]))
     }
 
     fn now() -> f64 {
@@ -297,6 +305,40 @@ mod profile {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs_f64())
             .unwrap_or(0.0)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        const TWO: &str = "[profile=default]\nTOKEN=old\nBASE_URL=https://api.doover.com\n\n[profile=staging]\nTOKEN=stg\n";
+
+        fn fields(token: &str) -> BTreeMap<String, String> {
+            BTreeMap::from([("TOKEN".to_string(), token.to_string())])
+        }
+
+        #[test]
+        fn refreshing_a_profile_keeps_the_blank_line_before_the_next() {
+            let out = rewrite(TWO, "default", &fields("new")).unwrap();
+            assert_eq!(
+                out,
+                "[profile=default]\nTOKEN=new\nBASE_URL=https://api.doover.com\n\n[profile=staging]\nTOKEN=stg\n"
+            );
+        }
+
+        #[test]
+        fn the_last_profile_keeps_its_trailing_newline() {
+            let out = rewrite(TWO, "staging", &fields("stg2")).unwrap();
+            assert!(out.ends_with("[profile=staging]\nTOKEN=stg2\n"), "{out:?}");
+            assert!(out.contains("doover.com\n\n[profile=staging]"));
+        }
+
+        #[test]
+        fn other_lines_are_left_alone() {
+            let out = rewrite(TWO, "default", &fields("new")).unwrap();
+            assert!(out.contains("BASE_URL=https://api.doover.com\n"));
+            assert!(rewrite(TWO, "nope", &fields("x")).is_none());
+        }
     }
 }
 
