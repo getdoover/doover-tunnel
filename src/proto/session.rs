@@ -51,10 +51,19 @@ pub struct TunnelSession {
     pub exp: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BasicAuth {
     pub username: String,
     pub password: String,
+}
+
+impl std::fmt::Debug for BasicAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BasicAuth")
+            .field("username", &self.username)
+            .field("password", &"[redacted]")
+            .finish()
+    }
 }
 
 fn default_true() -> bool {
