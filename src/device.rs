@@ -129,9 +129,10 @@ async fn serve(
     let crate::dial::Connected {
         mux,
         mut inbound,
-        mut control,
+        control,
         ..
     } = conn;
+    let (mut control_rd, mut control_wr) = tokio::io::split(control);
     let expires_in = Duration::from_secs(session.exp.saturating_sub(now_unix()));
     let expiry = tokio::time::sleep(expires_in);
     tokio::pin!(expiry);
@@ -139,7 +140,7 @@ async fn serve(
     // The control read is pinned across iterations so a partially received
     // Close is never lost, and it is polled first so a relay that sends
     // Close and then drops the socket is seen as a close, not a drop.
-    let control_read = read_msg::<_, Control>(&mut control);
+    let control_read = read_msg::<_, Control>(&mut control_rd);
     tokio::pin!(control_read);
 
     loop {
@@ -151,6 +152,12 @@ async fn serve(
                 }
             }
             _ = cancel.cancelled() => {
+                // Without this the relay sees a dropped link and holds the
+                // session (and its public port) for its reconnect grace.
+                let _ = tokio::time::timeout(
+                    Duration::from_secs(2),
+                    write_msg(&mut control_wr, &Control::Close { reason: "device closed".into() }),
+                ).await;
                 mux.close().await;
                 return Ok(());
             }
